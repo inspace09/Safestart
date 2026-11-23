@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeStart AI - 청년 알바·초년생 안전·권익 브리핑 에이전트</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .step-active { border-color: #2563eb; background-color: #eff6ff; }
+    .step-done { border-color: #16a34a; background-color: #f0fdf4; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+  <div class="max-w-5xl mx-auto px-4 py-8">
+    <!-- Header -->
+    <header class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
+      <div>
+        <span class="inline-block px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full mb-2">
+          AI 에이전트로 푸는 청년의 일·생활 문제
+        </span>
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
+          SafeStart AI <span class="text-blue-600 text-lg font-medium block md:inline md:ml-2">출근 전 1분 현장 안전·권익 브리핑 에이전트</span>
+        </h1>
+        <p class="text-sm text-slate-600 mt-1">
+          알바 공고나 직무 설명을 넣으면 3개의 전문 AI 에이전트가 <b>산재 위험요인 · 근로조건 리스크 · 첫날 필수 질문</b>을 자동 생성합니다.
+        </p>
+      </div>
+      <!-- API Key Toggle -->
+      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm w-full md:w-72">
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Gemini API Key (선택 · 미입력 시 데모 모드)</label>
+        <input id="apiKeyInput" type="password" placeholder="AIza... (비워두면 데모 즉시 실행)"
+          class="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+    </header>
+
+    <!-- Input Section -->
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h2 class="text-base font-bold text-slate-800">1. 채용 공고 또는 직무 내용 입력</h2>
+        <div class="flex flex-wrap gap-2">
+          <button onclick="loadPreset('logistics')" class="text-xs px-3 py-1.5 bg-slate-100 hover:bg-blue-100 hover:text-blue-700 rounded-lg font-medium transition">
+            📦 예시 1: 물류센터 야간 상하차
+          </button>
+          <button onclick="loadPreset('kitchen')" class="text-xs px-3 py-1.5 bg-slate-100 hover:bg-blue-100 hover:text-blue-700 rounded-lg font-medium transition">
+            🍳 예시 2: 음식점 주방·홀 알바
+          </button>
+          <button onclick="loadPreset('field')" class="text-xs px-3 py-1.5 bg-slate-100 hover:bg-blue-100 hover:text-blue-700 rounded-lg font-medium transition">
+            🦺 예시 3: 단기 현장 보조
+          </button>
+        </div>
+      </div>
+
+      <textarea id="jobInput" rows="5"
+        placeholder="여기에 알바 공고 내용, 근무 시간, 급여, 담당 업무를 붙여넣거나 위 예시 버튼을 눌러보세요."
+        class="w-full p-4 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"></textarea>
+
+      <div class="flex items-center justify-between">
+        <span id="modeBadge" class="text-xs text-slate-500">현재 모드: 데모 시뮬레이션 (API 키 입력 시 실시간 LLM 에이전트 구동)</span>
+        <button id="runBtn" onclick="runAgentPipeline()"
+          class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl shadow-sm transition flex items-center gap-2">
+          <span>에이전트 브리핑 실행</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Agent Pipeline Progress -->
+    <section id="pipelineSection" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div id="step1Card" class="p-4 rounded-xl border-2 border-slate-200 bg-white transition">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-bold text-slate-500">STEP 1</span>
+          <span id="step1Status" class="text-xs font-semibold text-slate-400">대기 중</span>
+        </div>
+        <h3 class="text-sm font-bold text-slate-800">🦺 현장 안전 분석 에이전트</h3>
+        <p class="text-xs text-slate-500 mt-1">직무별 산재 위험요인 및 필수 보호구 도출</p>
+      </div>
+
+      <div id="step2Card" class="p-4 rounded-xl border-2 border-slate-200 bg-white transition">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-bold text-slate-500">STEP 2</span>
+          <span id="step2Status" class="text-xs font-semibold text-slate-400">대기 중</span>
+        </div>
+        <h3 class="text-sm font-bold text-slate-800">⚖️ 근로 권익 스크리닝 에이전트</h3>
+        <p class="text-xs text-slate-500 mt-1">급여·휴게·수습·계약 조건 리스크 점검</p>
+      </div>
+
+      <div id="step3Card" class="p-4 rounded-xl border-2 border-slate-200 bg-white transition">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-bold text-slate-500">STEP 3</span>
+          <span id="step3Status" class="text-xs font-semibold text-slate-400">대기 중</span>
+        </div>
+        <h3 class="text-sm font-bold text-slate-800">📋 실행 브리핑 생성 에이전트</h3>
+        <p class="text-xs text-slate-500 mt-1">첫날 1분 체크리스트 & 사장님 필수 질문 생성</p>
+      </div>
+    </section>
+
+    <!-- Results Section -->
+    <section id="resultSection" class="hidden space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Safety Output -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+            Step 1. 현장 안전 위험요인 & 필수 보호구
+          </h3>
+          <div id="safetyOutput" class="space-y-3 text-sm"></div>
+        </div>
+
+        <!-- Rights Output -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+            Step 2. 근로조건 권익 스크리닝 결과
+          </h3>
+          <div id="rightsOutput" class="space-y-3 text-sm"></div>
+        </div>
+      </div>
+
+      <!-- Action Briefing Output -->
+      <div class="bg-slate-900 text-white rounded-2xl shadow-md p-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <h3 class="text-base font-bold flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            Step 3. 출근 첫날 바로 쓰는 1분 행동 브리핑
+          </h3>
+          <button onclick="copyBriefing()" class="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg transition">
+            📋 브리핑 전체 복사
+          </button>
+        </div>
+        <div id="actionOutput" class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const PRESETS = {
+      logistics: {
+        text: `[급구] 대형 물류센터 야간 상하차·분류 단기 알바 모집\n- 업무: 컨베이어 벨트 택배 분류, 20kg 내외 박스 상하차, 지게차 이동 구역 보조\n- 근무시간: 21:00 ~ 익일 06:00 (휴게시간 현장 상황에 따라 유동적)\n- 급여: 일급 115,000원 (초보자 첫 3일은 수습 90% 지급)\n- 복장: 편한 복장 및 운동화 착용, 근로계약서는 일주일 일해보고 작성`,
+        demo: {
+          safety: [
+            { title: "지게차 충돌 및 협착 위험", level: "높음", desc: "지게차 이동 동선과 보행자 구역이 혼재된 경우 중대재해 위험이 매우 큽니다. 이어폰 착용 금지 및 보행 통로 준수가 필수입니다." },
+            { title: "중량물(20kg) 취급 근골격계 질환", level: "높음", desc: "허리만 숙여 들어 올리면 급성 요추 염좌가 발생합니다. 무릎을 굽혀 하체 힘으로 들고 몸에 밀착해 운반하세요." },
+            { title: "컨베이어 벨트 끼임 사고", level: "중간", desc: "장갑이나 헐렁한 옷소매가 롤러에 말려들 수 있습니다. 가동 중 이물질 제거를 절대 손으로 하지 마세요." },
+            { title: "필수 보호구(PPE)", level: "필수", desc: "일반 운동화 대신 앞코가 단단한 안전화(낙하물 보호), 미끄럼 방지 코팅 장갑, 형광 조끼 착용이 필요합니다." }
+          ],
+          rights: [
+            { status: "위험", item: "단기 알바 수습 90% 감액 위법 소지", detail: "수습 기간 최저임금 10% 감액은 '1년 이상 근로계약'을 체결한 경우에만 가능하며, 단순노무직(상하차·분류)은 아예 감액이 불가합니다." },
+            { status: "위험", item: "근로계약서 작성 지연", detail: "근로계약서는 근무 시작 전(또는 첫날 업무 투입 전)에 서면 교부해야 하며, 일주일 뒤 작성은 근로기준법 위반입니다." },
+            { status: "주의", item: "휴게시간 불명확 & 야간수당 확인 필요", detail: "8시간 이상 근무 시 최소 1시간의 휴게시간이 보장되어야 합니다. 22:00~06:00 야간근로 가산수당(50%)이 일급에 포함되었는지 확인하세요." }
+          ],
+          checklist: [
+            "출근 즉시 안전화 대여 여부 및 지게차 전용 통로 위치 확인하기",
+            "컨베이어 비상정지 버튼 위치와 현장 관리자 연락처 저장하기",
+            "업무 시작 전 근로계약서 작성 및 야간수당 포함 여부 확인하기",
+            "20kg 이상 박스는 무리하지 말고 2인 1조 또는 대차 요청하기"
+          ],
+          questions: [
+            "\"안녕하세요! 안전하게 일하고 싶어서 여쭤보는데, 현장에서 안전화나 안전조끼를 지급해 주시나요?\"",
+            "\"공고에 수습 90%라고 되어 있는데, 단기 근무도 감액이 적용되는지 급여 기준을 정확히 확인하고 싶습니다.\"",
+            "\"근로계약서는 첫날 출근해서 업무 시작 전에 바로 작성할 수 있을까요? 휴게시간은 보통 몇 시에 주어지나요?\""
+          ]
+        }
+      },
+      kitchen: {
+        text: `번화가 호프집 주방 보조 및 홀 서빙 알바 구합니다\n- 업무: 튀김기 조리 보조, 설거지, 뜨거운 철판 서빙, 마감 바닥 물청소\n- 근무시간: 금·토 18:00 ~ 02:00 (바쁘면 쉬는 시간 없이 쭉 일하고 식사 제공)\n- 급여: 시급 10,500원 (주휴수당 없음, 보건증은 일하면서 천천히 발급)`,
+        demo: {
+          safety: [
+            { title: "튀김기·뜨거운 철판 화상 위험", level: "높음", desc: "기름 튐 및 고온 용기 접촉 화상이 가장 빈번합니다. 젖은 식자재 투입 시 기름이 폭발적으로 튈 수 있어 주의가 필요합니다." },
+            { title: "주방 바닥 물기·기름기 미끄러짐(전도)", level: "높음", desc: "마감 물청소 및 조리 중 바닥 미끄러짐으로 인한 골절·화상 2차 사고 위험이 큽니다." },
+            { title: "세척제(락스 등) 혼합 및 피부 자극", level: "중간", desc: "마감 청소 시 산성 세제와 락스를 섞으면 유독가스가 발생합니다. 환기 후 단독 사용하세요." },
+            { status: "필수 보호구(PPE)", level: "필수", desc: "미끄럼 방지(논슬립) 주방화, 방수 앞치마, 고온용 장갑(또는 면장갑+고무장갑 이중 착용)." }
+          ],
+          rights: [
+            { status: "위험", item: "휴게시간 미부여 (근로기준법 위반)", detail: "1일 8시간 근무(18:00~02:00) 시 도중에 최소 1시간의 휴게시간을 반드시 부여해야 합니다." },
+            { status: "위험", item: "주휴수당 미지급 조건 확인 필요", detail: "금·토 8시간씩 주 16시간(휴게 1시간 제외 시 14시간) 근무로, 실근로시간이 주 15시간 이상이면 주휴수당 지급 대상입니다." },
+            { status: "주의", item: "야간근로 가산수당 & 보건증 사전 발급", detail: "5인 이상 사업장이라면 22:00~02:00 야간수당(1.5배)이 적용됩니다. 식품위생법상 보건증 없이 근무 시 과태료 대상이 될 수 있습니다." }
+          ],
+          checklist: [
+            "화상 응급처치용 흐르는 찬물 위치 및 구급함(화상연고) 위치 파악하기",
+            "미끄럼 방지 기능이 있는 주방화 챙겨가기",
+            "5인 이상 사업장 여부 및 실근로시간(휴게시간 제외) 확인하기",
+            "출근 전 보건증 발급 완료 후 사본 제출하기"
+          ],
+          questions: [
+            "\"사장님, 근무 시간이 8시간인데 중간에 식사나 휴게시간은 몇 분 정도 별도로 보장되나요?\"",
+            "\"주방 바닥이 미끄러울 수 있을 것 같은데, 미끄럼 방지 주방화를 개인적으로 챙겨가면 될까요?\"",
+            "\"주 15시간 이상 근무하게 되면 주휴수당과 22시 이후 야간수당은 급여에 어떻게 반영되는지 여쭤봐도 될까요?\""
+          ]
+        }
+      },
+      field: {
+        text: `지반 조사 및 측량 현장 보조 단기 알바 (1개월)\n- 업무: 야외 간척지 현장 천공 장비 보조, 물 호스 이동, GPS 위치 신호, 자재 운반\n- 근무시간: 07:30 ~ 17:30 (현장 이동시간 1시간 별도, 무급)\n- 급여: 일당 130,000원 (4대보험 미가입, 3.3% 사업소득 공제 후 월말 일괄 지급)`,
+        demo: {
+          safety: [
+            { title: "천공기 등 중장비 회전부 끼임 및 협착", level: "높음", desc: "천공 로드 회전부 근처 작업 시 장갑이나 옷자락 말림 사고가 치명적입니다. 장비 반경 내 접근 전 반드시 운전원과 수신호하세요." },
+            { title: "연약 지반(간척지) 빠짐·전도 및 호스 걸림", level: "높음", desc: "진흙·연약 지반에서 발이 빠지거나 고압 물 호스에 걸려 넘어질 수 있습니다. 이동 경로를 사전에 확인하세요." },
+            { title: "야외 기상(한랭/온열) 및 낙하물 위험", level: "중간", desc: "장시간 야외 노출에 대비한 보온/수분 보충과 장비 주변 낙하물 대비가 필요합니다." },
+            { status: "필수 보호구(PPE)", level: "필수", desc: "안전모(턱끈 체결), 방수 안전장화, 절단·미끄럼 방지 작업장갑, 반사 조끼." }
+          ],
+          rights: [
+            { status: "위험", item: "일용근로자 3.3% 사업소득 위장 처리", detail: "지휘·감독을 받으며 출퇴근하는 현장 보조는 근로기준법상 근로자입니다. 3.3% 처리 시 산재보험·고용보험 보호에서 누락될 위험이 큽니다." },
+            { status: "주의", item: "현장 이동시간(대기시간) 임금 기준 모호", detail: "회사 집합 후 자재를 싣고 현장으로 이동하는 시간은 사용자의 지휘 아래 있으므로 근로시간으로 인정될 여지가 큽니다." },
+            { status: "주의", item: "산재보험 가입 여부 필수 확인", detail: "위험도가 높은 현장 업무이므로 4대보험 미가입 상태라도 산재보험 적용 대상임을 명확히 확인해야 합니다." }
+          ],
+          checklist: [
+            "안전모·안전장화 등 개인보호구 지급 여부 출근 전 확인하기",
+            "중장비 운전원과 정지/이동 수신호 약속 미리 맞추기",
+            "출퇴근 시간·작업 내용·현장 사진 매일 개인 메모로 기록해 두기",
+            "산재보험 가입 여부 및 근로계약서 작성 요청하기"
+          ],
+          questions: [
+            "\"현장 안전모랑 방수 안전장화는 회사에서 지급해 주시는지, 개인 준비물이 있는지 확인 부탁드립니다.\"",
+            "\"현장 업무라 안전이 중요한데, 3.3% 공제 대신 일용근로자 신고(산재보험 가입)로 처리가 가능할까요?\"",
+            "\"아침에 집합해서 현장으로 이동하는 1시간도 근무시간에 포함되는지, 점심시간은 몇 시인지 궁금합니다.\""
+          ]
+        }
+      }
+    };
+
+    let currentPresetKey = null;
+    let latestBriefingText = "";
+
+    document.getElementById("apiKeyInput").addEventListener("input", (e) => {
+      const badge = document.getElementById("modeBadge");
+      if (e.target.value.trim().length > 10) {
+        badge.textContent = "현재 모드: 실시간 Gemini 2.5 Flash 3단계 에이전트 체이닝";
+        badge.className = "text-xs font-semibold text-blue-600";
+      } else {
+        badge.textContent = "현재 모드: 데모 시뮬레이션 (API 키 입력 시 실시간 LLM 에이전트 구동)";
+        badge.className = "text-xs text-slate-500";
+      }
+    });
+
+    function loadPreset(key) {
+      currentPresetKey = key;
+      document.getElementById("jobInput").value = PRESETS[key].text;
+    }
+
+    function setStepState(stepNum, state, label) {
+      const card = document.getElementById(`step${stepNum}Card`);
+      const status = document.getElementById(`step${stepNum}Status`);
+      card.classList.remove("step-active", "step-done");
+      if (state === "active") {
+        card.classList.add("step-active");
+        status.className = "text-xs font-bold text-blue-600 animate-pulse";
+      } else if (state === "done") {
+        card.classList.add("step-done");
+        status.className = "text-xs font-bold text-green-600";
+      } else {
+        status.className = "text-xs font-semibold text-slate-400";
+      }
+      status.textContent = label;
+    }
+
+    async function callGeminiJSON(apiKey, systemPrompt, userPrompt) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.3 }
+        })
+      });
+      if (!res.ok) throw new Error(`API 오류 (${res.status}): API 키를 확인하세요.`);
+      const data = await res.json();
+      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      return JSON.parse(raw);
+    }
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    async function runAgentPipeline() {
+      const jobText = document.getElementById("jobInput").value.trim();
+      const apiKey = document.getElementById("apiKeyInput").value.trim();
+      if (!jobText) {
+        alert("채용 공고 내용을 입력하거나 상단의 예시 버튼을 눌러주세요.");
+        return;
+      }
+
+      const btn = document.getElementById("runBtn");
+      btn.disabled = true;
+      btn.textContent = "에이전트 분석 중...";
+      document.getElementById("resultSection").classList.add("hidden");
+      setStepState(1, "idle", "대기 중");
+      setStepState(2, "idle", "대기 중");
+      setStepState(3, "idle", "대기 중");
+
+      try {
+        let safetyData, rightsData, actionData;
+
+        if (apiKey.length > 10) {
+          // Real Multi-step Agent Chaining
+          setStepState(1, "active", "위험요인 분석 중...");
+          const sRes = await callGeminiJSON(
+            apiKey,
+            `당신은 산업안전보건 전문가 에이전트입니다. 공고/직무 내용을 분석해 반드시 아래 JSON 형식으로만 응답하세요.
+            {"items":[{"title":"위험요인명","level":"높음|중간|필수","desc":"구체적 예방수칙(2문장)"}]}
+            항목은 4개(핵심 위험요인 3개 + 마지막 1개는 필수 보호구(PPE))로 작성하세요.`,
+            `[공고 내용]\n${jobText}`
+          );
+          safetyData = sRes.items || [];
+          setStepState(1, "done", "분석 완료");
+
+          setStepState(2, "active", "근로조건 스크리닝 중...");
+          const rRes = await callGeminiJSON(
+            apiKey,
+            `당신은 대한민국 근로기준법 전문 에이전트입니다. 공고의 급여·휴게·수습·계약 조건의 법적 리스크나 누락 사항을 찾아 아래 JSON 형식으로만 응답하세요.
+            {"items":[{"status":"위험|주의|확인","item":"핵심 이슈","detail":"법적 기준 및 설명(2문장)"}]}
+            항목은 3개로 작성하세요.`,
+            `[공고 내용]\n${jobText}`
+          );
+          rightsData = rRes.items || [];
+          setStepState(2, "done", "스크리닝 완료");
+
+          setStepState(3, "active", "행동 브리핑 생성 중...");
+          const aRes = await callGeminiJSON(
+            apiKey,
+            `당신은 사회초년생 커리어 코치 에이전트입니다. 앞선 1·2단계 분석 결과를 종합해 출근 첫날 바로 쓸 체크리스트와 사업주에게 정중하게 물어볼 질문 3개를 아래 JSON 형식으로만 응답하세요.
+            {"checklist":["체크1","체크2","체크3","체크4"],"questions":["질문1","질문2","질문3"]}`,
+            `[1단계 안전 분석]\n${JSON.stringify(safetyData)}\n\n[2단계 권익 분석]\n${JSON.stringify(rightsData)}`
+          );
+          actionData = aRes;
+          setStepState(3, "done", "브리핑 완료");
+        } else {
+          // Demo Simulation Mode
+          const matchedKey = currentPresetKey && PRESETS[currentPresetKey].text === jobText
+            ? currentPresetKey
+            : (jobText.includes("주방") || jobText.includes("홀") ? "kitchen" : jobText.includes("현장") || jobText.includes("측량") ? "field" : "logistics");
+          const demo = PRESETS[matchedKey].demo;
+
+          setStepState(1, "active", "위험요인 분석 중...");
+          await sleep(700);
+          safetyData = demo.safety;
+          setStepState(1, "done", "분석 완료");
+
+          setStepState(2, "active", "근로조건 스크리닝 중...");
+          await sleep(700);
+          rightsData = demo.rights;
+          setStepState(2, "done", "스크리닝 완료");
+
+          setStepState(3, "active", "행동 브리핑 생성 중...");
+          await sleep(700);
+          actionData = { checklist: demo.checklist, questions: demo.questions };
+          setStepState(3, "done", "브리핑 완료");
+        }
+
+        renderResults(safetyData, rightsData, actionData);
+      } catch (err) {
+        alert("실행 중 오류가 발생했습니다: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "에이전트 브리핑 실행";
+      }
+    }
+
+    function renderResults(safety, rights, action) {
+      const safetyEl = document.getElementById("safetyOutput");
+      safetyEl.innerHTML = safety.map(s => {
+        const badgeColor = s.level === "높음" ? "bg-red-100 text-red-700" : s.level === "필수" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700";
+        return `
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-bold text-slate-800">${s.title}</span>
+              <span class="text-xs px-2 py-0.5 rounded-full font-semibold ${badgeColor}">${s.level}</span>
+            </div>
+            <p class="text-slate-600 text-xs leading-relaxed">${s.desc}</p>
+          </div>`;
+      }).join("");
+
+      const rightsEl = document.getElementById("rightsOutput");
+      rightsEl.innerHTML = rights.map(r => {
+        const badgeColor = r.status === "위험" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700";
+        return `
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-bold text-slate-800">${r.item}</span>
+              <span class="text-xs px-2 py-0.5 rounded-full font-semibold ${badgeColor}">${r.status}</span>
+            </div>
+            <p class="text-slate-600 text-xs leading-relaxed">${r.detail}</p>
+          </div>`;
+      }).join("");
+
+      const actionEl = document.getElementById("actionOutput");
+      actionEl.innerHTML = `
+        <div>
+          <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-3">✅ 출근 첫날 1분 체크리스트</h4>
+          <ul class="space-y-2.5">
+            ${(action.checklist || []).map(c => `
+              <li class="flex items-start gap-2.5 text-slate-200">
+                <input type="checkbox" class="mt-1 accent-emerald-400" />
+                <span>${c}</span>
+              </li>`).join("")}
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-xs font-bold uppercase tracking-wider text-sky-400 mb-3">💬 사장님/관리자에게 물어볼 필수 질문 3가지</h4>
+          <div class="space-y-2.5">
+            ${(action.questions || []).map((q, i) => `
+              <div class="p-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-xs leading-relaxed">
+                <span class="font-bold text-sky-400 mr-1">Q${i + 1}.</span> ${q}
+              </div>`).join("")}
+          </div>
+        </div>
+      `;
+
+      latestBriefingText = `[SafeStart AI 첫날 브리핑]\n\n✅ 1분 체크리스트\n${(action.checklist || []).map(c => "- " + c).join("\n")}\n\n💬 필수 질문 3가지\n${(action.questions || []).map((q, i) => `${i + 1}. ${q}`).join("\n")}`;
+      document.getElementById("resultSection").classList.remove("hidden");
+      document.getElementById("resultSection").scrollIntoView({ behavior: "smooth" });
+    }
+
+    function copyBriefing() {
+      navigator.clipboard.writeText(latestBriefingText);
+      alert("브리핑 내용이 클립보드에 복사되었습니다!");
+    }
+
+    // 페이지 로드 시 첫 번째 예시 자동 세팅
+    loadPreset("logistics");
+  </script>
+</body>
+</html>
